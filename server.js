@@ -14,6 +14,9 @@ app.set('trust proxy', 1)
 
 app.use(express.json())
 app.use(express.static('public'))
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
 
 app.use(session({
     secret: process.env.SESSION_SECRET,
@@ -163,7 +166,8 @@ res.status(500).send("Error interno")
 
 })
 
-// iniciar servidor
-app.listen(process.env.PORT || 3000, () => {
-console.log("Whitelist iniciada")
-})
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Whitelist iniciada en puerto ${PORT}`);
+});
