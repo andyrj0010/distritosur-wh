@@ -9,7 +9,7 @@ const axios = require('axios')
 
 const app = express()
 
-// necesario para Railway (proxy)
+// necesario para Railway
 app.set('trust proxy', 1)
 
 app.use(express.json())
@@ -34,7 +34,7 @@ passport.use(new DiscordStrategy({
     scope: ['identify']
 },
 (accessToken, refreshToken, profile, done) => {
-    process.nextTick(() => done(null, profile))
+    return done(null, profile)
 }))
 
 // login discord
@@ -47,7 +47,12 @@ passport.authenticate('discord', { failureRedirect: '/' }),
     res.redirect('/')
 })
 
-// obtener usuario logueado
+// asegurar index
+app.get('/', (req,res)=>{
+    res.sendFile(__dirname + '/public/index.html')
+})
+
+// usuario logueado
 app.get('/api/user',(req,res)=>{
 
 if(!req.user){
@@ -68,12 +73,14 @@ res.json({
 // enviar whitelist
 app.post('/api/submit', async (req,res)=>{
 
+try{
+
 if(!req.user) return res.status(401).send("No login")
 
 const userId = req.user.id
 const now = Date.now()
 
-// comprobar cooldown 24h
+// cooldown 24h
 if(whitelistAttempts.has(userId)){
 
 const lastAttempt = whitelistAttempts.get(userId)
@@ -85,13 +92,11 @@ return res.json({cooldown:true})
 
 }
 
-// guardar intento
 whitelistAttempts.set(userId, now)
 
 const score = req.body.score || 0
 const wrong = Array.isArray(req.body.wrong) ? req.body.wrong : []
 
-// obtener ip real
 const ip = (req.headers['x-forwarded-for'] || '').split(',')[0] || req.socket.remoteAddress
 
 const embed = {
@@ -100,7 +105,7 @@ embeds:[{
 
 title:"📋 Resultado WH",
 
-color: 3447003,
+color:3447003,
 
 fields:[
 
@@ -130,7 +135,7 @@ inline:true
 
 {
 name:"❌ Preguntas falladas",
-value: Array.isArray(wrong) && wrong.length ? wrong.join(", ") : "Ninguna",
+value: wrong.length ? wrong.join(", ") : "Ninguna",
 inline:false
 }
 
@@ -140,9 +145,21 @@ inline:false
 
 }
 
+// enviar webhook
+try{
 await axios.post(process.env.WEBHOOK_URL, embed)
+}catch(err){
+console.error("Webhook error:", err.message)
+}
 
 res.json({success:true})
+
+}catch(err){
+
+console.error("Submit error:", err)
+res.status(500).send("Error interno")
+
+}
 
 })
 
