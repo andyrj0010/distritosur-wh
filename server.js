@@ -9,6 +9,9 @@ const axios = require('axios')
 
 const app = express()
 
+// necesario para Railway (proxy)
+app.set('trust proxy', 1)
+
 app.use(express.json())
 app.use(express.static('public'))
 
@@ -34,14 +37,17 @@ passport.use(new DiscordStrategy({
     process.nextTick(() => done(null, profile))
 }))
 
+// login discord
 app.get('/auth/discord', passport.authenticate('discord'))
 
+// callback discord
 app.get('/auth/discord/callback',
 passport.authenticate('discord', { failureRedirect: '/' }),
 (req,res)=>{
     res.redirect('/')
 })
 
+// obtener usuario logueado
 app.get('/api/user',(req,res)=>{
 
 if(!req.user){
@@ -58,6 +64,8 @@ res.json({
 })
 
 })
+
+// enviar whitelist
 app.post('/api/submit', async (req,res)=>{
 
 if(!req.user) return res.status(401).send("No login")
@@ -65,7 +73,7 @@ if(!req.user) return res.status(401).send("No login")
 const userId = req.user.id
 const now = Date.now()
 
-// comprobar si ya la hizo
+// comprobar cooldown 24h
 if(whitelistAttempts.has(userId)){
 
 const lastAttempt = whitelistAttempts.get(userId)
@@ -80,11 +88,11 @@ return res.json({cooldown:true})
 // guardar intento
 whitelistAttempts.set(userId, now)
 
-const {score, wrong} = req.body
+const score = req.body.score || 0
+const wrong = Array.isArray(req.body.wrong) ? req.body.wrong : []
 
-const ip =
-req.headers['x-forwarded-for'] ||
-req.socket.remoteAddress
+// obtener ip real
+const ip = (req.headers['x-forwarded-for'] || '').split(',')[0] || req.socket.remoteAddress
 
 const embed = {
 
@@ -92,7 +100,7 @@ embeds:[{
 
 title:"📋 Resultado WH",
 
-color: score >=7 ? 5763719 : 15548997,
+color: 3447003,
 
 fields:[
 
@@ -110,18 +118,20 @@ inline:true
 
 {
 name:"🌐 IP",
-value:ip
+value:ip,
+inline:false
 },
 
 {
-name:"✅ Aciertos",
+name:"📊 Aciertos",
 value:`${score}/10`,
 inline:true
 },
 
 {
 name:"❌ Preguntas falladas",
-value: wrong.length ? wrong.join(", ") : "Ninguna"
+value: Array.isArray(wrong) && wrong.length ? wrong.join(", ") : "Ninguna",
+inline:false
 }
 
 ]
@@ -136,8 +146,7 @@ res.json({success:true})
 
 })
 
-app.listen(3000,()=>{
-
-console.log("Whitelist funcionando en puerto 3000")
-
+// iniciar servidor
+app.listen(process.env.PORT || 3000, () => {
+console.log("Whitelist iniciada")
 })
